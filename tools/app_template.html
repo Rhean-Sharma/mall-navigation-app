@@ -5,26 +5,30 @@
   --bg:#f5f4f1; --panel:#ffffff; --ink:#1c1c1e; --ink2:#5c5b57; --line:#e3e1db;
   --accent:#0d9488; --accent-ink:#ffffff; --chip:#eceae5; --shadow:0 6px 24px rgba(20,20,18,.14);
   --good:#15803d; --warn:#b45309; --bad:#b91c1c;
-  --d-adirondacks:#2d5b2d; --d-saratoga:#cc1236; --d-hudson:#6b4a2f;
-  --d-hamptons:#e08a14; --d-niagara:#4a5fc0; --d-markethall:#6f6e6a;
-  --map-filter:none;
+  --d-adirondacks:#3c6e3c; --d-saratoga:#d1355c; --d-hudson:#8a6547;
+  --d-hamptons:#e59a2e; --d-niagara:#6377cc; --d-markethall:#6f6e6a;
+  --walk:#e4e2dc; --hall:#fbfaf8; --kiosk:#cfccc5;
 }
 @media (prefers-color-scheme: dark){:root{
   --bg:#191a1c; --panel:#232427; --ink:#f0efec; --ink2:#a3a29d; --line:#37383c;
   --accent:#2dd4bf; --accent-ink:#08312c; --chip:#2e2f33; --shadow:0 6px 24px rgba(0,0,0,.5);
-  --d-hamptons:#f0a83c; --d-markethall:#989792;
-  --map-filter:brightness(.82) contrast(1.05) saturate(.95);
+  --d-adirondacks:#38603a; --d-saratoga:#a83a55; --d-hudson:#7d6047;
+  --d-hamptons:#c08a35; --d-niagara:#5568b3; --d-markethall:#989792;
+  --walk:#26282c; --hall:#303236; --kiosk:#44464b;
 }}
 :root[data-theme="light"]{
   --bg:#f5f4f1; --panel:#ffffff; --ink:#1c1c1e; --ink2:#5c5b57; --line:#e3e1db;
   --accent:#0d9488; --accent-ink:#ffffff; --chip:#eceae5; --shadow:0 6px 24px rgba(20,20,18,.14);
-  --d-hamptons:#e08a14; --d-markethall:#6f6e6a; --map-filter:none;
+  --d-adirondacks:#3c6e3c; --d-saratoga:#d1355c; --d-hudson:#8a6547;
+  --d-hamptons:#e59a2e; --d-niagara:#6377cc; --d-markethall:#6f6e6a;
+  --walk:#e4e2dc; --hall:#fbfaf8; --kiosk:#cfccc5;
 }
 :root[data-theme="dark"]{
   --bg:#191a1c; --panel:#232427; --ink:#f0efec; --ink2:#a3a29d; --line:#37383c;
   --accent:#2dd4bf; --accent-ink:#08312c; --chip:#2e2f33; --shadow:0 6px 24px rgba(0,0,0,.5);
-  --d-hamptons:#f0a83c; --d-markethall:#989792;
-  --map-filter:brightness(.82) contrast(1.05) saturate(.95);
+  --d-adirondacks:#38603a; --d-saratoga:#a83a55; --d-hudson:#7d6047;
+  --d-hamptons:#c08a35; --d-niagara:#5568b3; --d-markethall:#989792;
+  --walk:#26282c; --hall:#303236; --kiosk:#44464b;
 }
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 html,body{margin:0; height:100%; overflow:hidden}
@@ -40,8 +44,12 @@ input{font:inherit; color:inherit}
 #viewport{position:absolute; inset:0; overflow:hidden; background:var(--bg)}
 #rotor{position:absolute; inset:0; will-change:transform}
 #world{position:absolute; left:0; top:0; width:1870px; height:1640px; transform-origin:0 0; will-change:transform}
-#world img{position:absolute; inset:0; width:1870px; height:1640px; filter:var(--map-filter); pointer-events:none; user-select:none; -webkit-user-drag:none}
-#overlay{position:absolute; left:0; top:0; pointer-events:none}
+#overlay{position:absolute; left:0; top:0; pointer-events:none; --crot:0deg}
+/* elements that stay upright while the map rotates share one CSS variable,
+   so a heading change costs a single style write */
+.cr{transform:rotate(var(--crot))}
+.dlabel{font-weight:800; letter-spacing:.14em; text-transform:uppercase; pointer-events:none; paint-order:stroke}
+.suite{font-weight:600; pointer-events:none; paint-order:stroke}
 
 /* ---------- top chrome ---------- */
 #topbar{position:absolute; top:calc(10px + env(safe-area-inset-top)); left:12px; right:12px; z-index:30; display:flex; flex-direction:column; gap:8px; pointer-events:none}
@@ -146,7 +154,6 @@ h1{font-size:17px; font-weight:800; letter-spacing:-.01em; margin:0}
 <div id="viewport">
   <div id="rotor">
     <div id="world">
-      <img id="mapimg" src="__MAPIMG__" alt="Woodbury Common map">
       <svg id="overlay" width="1870" height="1640" viewBox="0 0 1870 1640"></svg>
     </div>
   </div>
@@ -186,17 +193,21 @@ h1{font-size:17px; font-weight:800; letter-spacing:-.01em; margin:0}
 const DATA = __DATA__;
 
 /* ================= config / georeference ================= */
+// Fitted by least squares against surveyed store positions: the printed map's
+// "up" points 115.5° (ESE) in the real world, at 0.397 m per map pixel.
+// Anchor: The North Face storefront (suite 461).
 const GEO = {
-  refPx:[940,700],            // gazebo, map px
-  refLat:41.32120, refLng:-74.12500,
-  metersPerPx:0.45,
-  mapBearing:0,               // degrees: real-world bearing of map "up"
+  refPx:[821,964],
+  refLat:41.32115, refLng:-74.12842,
+  metersPerPx:0.397,
+  mapBearing:115.5,           // degrees: real-world bearing of map "up"
+  declination:-12.6,          // magnetic→true correction for Central Valley NY
 };
 const WALK_MPS = 1.30;
-const LS = {cal:'wcnav.cal', theme:'wcnav.theme'};
+const LS = {cal:'wcnav.cal2', theme:'wcnav.theme'};
 
-const DCOLORS = {adirondacks:'#2d5b2d', saratoga:'#cc1236', hudson:'#6b4a2f',
-                 hamptons:'#e08a14', niagara:'#4a5fc0', markethall:'#6f6e6a'};
+const DCOLORS = {adirondacks:'var(--d-adirondacks)', saratoga:'var(--d-saratoga)', hudson:'var(--d-hudson)',
+                 hamptons:'var(--d-hamptons)', niagara:'var(--d-niagara)', markethall:'var(--d-markethall)'};
 const DNAMES  = {adirondacks:'Adirondacks', saratoga:'Saratoga', hudson:'Hudson Valley',
                  hamptons:'Hamptons', niagara:'Niagara', markethall:'Market Hall'};
 // stores whose names are printed on the map — always labelled
@@ -229,10 +240,33 @@ let toastT;
 function toast(msg,ms=2600){const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),ms);}
 
 /* ================= transform / pan / zoom ================= */
+let needleEl=null;
 function apply(){
   world.style.transform=`translate(${S.tx}px,${S.ty}px) scale(${S.k})`;
   rotor.style.transform=`rotate(${S.rot}rad)`;
-  updateCounterRot(); updateZoomClasses();
+  ov.style.setProperty('--crot',(-S.rot*180/Math.PI)+'deg');
+  if(!needleEl)needleEl=document.querySelector('#compassFab .needle');
+  if(needleEl)needleEl.style.transform=`rotate(${-GEO.mapBearing+S.rot*180/Math.PI}deg)`;
+  updateZoomClasses();
+}
+// change rotation while keeping a world point fixed on screen (else pivots on
+// the viewport centre) — stops the map "flying" when it spins around you
+function rotateTo(rot,pv){
+  if(pv){
+    const r=vp.getBoundingClientRect(), cx=r.width/2, cy=r.height/2;
+    const dr=S.rot-rot, c=Math.cos(dr), s=Math.sin(dr);
+    const ax=S.tx+S.k*pv[0]-cx, ay=S.ty+S.k*pv[1]-cy;
+    S.tx=cx+ax*c-ay*s-S.k*pv[0];
+    S.ty=cy+ax*s+ay*c-S.k*pv[1];
+  }
+  S.rot=rot; apply();
+}
+function rotPivot(){
+  if(!S.pos)return null;
+  const r=vp.getBoundingClientRect(), cx=r.width/2, cy=r.height/2;
+  const ax=S.tx+S.k*S.pos.x-cx, ay=S.ty+S.k*S.pos.y-cy, c=Math.cos(S.rot), s=Math.sin(S.rot);
+  const sx=cx+ax*c-ay*s, sy=cy+ax*s+ay*c;
+  return (sx>-40&&sy>-40&&sx<r.width+40&&sy<r.height+40)?[S.pos.x,S.pos.y]:null;
 }
 function screenToWorld(sx,sy){
   const r=vp.getBoundingClientRect(), cx=r.width/2, cy=r.height/2;
@@ -365,22 +399,36 @@ $('#locateFab').addEventListener('click',()=>{
 });
 
 /* ================= compass ================= */
-let compassReady=false;
+// Readings are magnetic north referenced; GEO.declination corrects to true
+// north. Updates are deadbanded, eased through rAF, and the map pivots on your
+// own dot, so heading-up tracks smoothly instead of flying around.
+let compassReady=false, sawAbsolute=false, headingTarget=null, headingRAF=0;
 function onOrient(e){
-  let h=null;
-  if(typeof e.webkitCompassHeading==='number' && !isNaN(e.webkitCompassHeading)) h=e.webkitCompassHeading;
-  else if(e.absolute && typeof e.alpha==='number') h=(360-e.alpha)%360;
-  else if(typeof e.alpha==='number') h=(360-e.alpha)%360;
+  let h=null, absolute=false;
+  if(typeof e.webkitCompassHeading==='number' && !isNaN(e.webkitCompassHeading)){h=e.webkitCompassHeading; absolute=true;}
+  else if(typeof e.alpha==='number'){h=(360-e.alpha)%360; absolute=!!e.absolute;}
   if(h==null)return;
+  if(sawAbsolute && !absolute)return;           // ignore relative gyro once we have a real compass
+  if(absolute)sawAbsolute=true;
   compassReady=true;
-  // smooth (shortest arc)
-  if(S.heading==null)S.heading=h;
-  else{let d=((h-S.heading+540)%360)-180; S.heading=(S.heading+d*0.25+360)%360;}
-  const needle=document.querySelector('#compassFab .needle');
-  const mapH = S.heading - GEO.mapBearing;
-  if(needle)needle.style.transform=`rotate(${-mapH}deg)`;
-  if(S.headingUp){S.rot=-mapH*Math.PI/180; apply();}
-  else drawUser();
+  h=(h+GEO.declination+360)%360;                // magnetic → true
+  if(headingTarget!=null){const d=((h-headingTarget+540)%360)-180; if(Math.abs(d)<0.4)return;}
+  headingTarget=h;
+  if(!headingRAF)headingRAF=requestAnimationFrame(tickHeading);
+}
+function tickHeading(){
+  headingRAF=0;
+  if(headingTarget==null)return;
+  if(S.heading==null)S.heading=headingTarget;
+  else{
+    const d=((headingTarget-S.heading+540)%360)-180;
+    S.heading=Math.abs(d)<0.05?headingTarget:(S.heading+d*0.18+360)%360;
+  }
+  const mapH=((S.heading-GEO.mapBearing)%360+360)%360;
+  if(S.headingUp)rotateTo(-mapH*Math.PI/180,rotPivot());
+  drawUser();
+  const d2=((headingTarget-S.heading+540)%360)-180;
+  if(Math.abs(d2)>=0.05)headingRAF=requestAnimationFrame(tickHeading);
 }
 async function enableCompass(){
   try{
@@ -398,8 +446,11 @@ $('#compassFab').addEventListener('click',async()=>{
   if(!compassReady){const ok=await enableCompass(); if(!ok)return;}
   S.headingUp=!S.headingUp;
   $('#compassFab').classList.toggle('active',S.headingUp);
-  if(!S.headingUp){S.rot=0; apply();}
-  toast(S.headingUp?'Heading-up — map rotates with you':'North-up');
+  if(S.headingUp){
+    if(S.pos)centerOn(S.pos.x,S.pos.y,Math.max(S.k,0.7));
+    if(S.heading!=null)rotateTo(-(((S.heading-GEO.mapBearing)%360+360)%360)*Math.PI/180,rotPivot());
+  } else rotateTo(0,rotPivot());
+  toast(S.headingUp?'Heading-up — map rotates with you':'Map view');
 });
 
 /* ================= graph / routing ================= */
@@ -468,7 +519,32 @@ function reroute(){
 const NS='http://www.w3.org/2000/svg';
 function el(tag,attrs,parent){const n=document.createElementNS(NS,tag); for(const k in attrs)n.setAttribute(k,attrs[k]); (parent||ov).appendChild(n); return n;}
 const layers={};
-for(const name of ['districts','route','stores','labels','amen','user'])layers[name]=el('g',{id:'ly-'+name});
+for(const name of ['base','districts','route','suites','stores','labels','amen','user'])layers[name]=el('g',{id:'ly-'+name});
+// position an element in world space but keep it upright as the map rotates
+function upright(n,x,y){n.style.transform=`translate(${x}px,${y}px) rotate(var(--crot))`;}
+
+/* ---- vector basemap (extracted from the official map by tools/build_basemap.py) ---- */
+const BM=DATA.basemap;
+const pathOf=polys=>polys.map(p=>'M'+p.map(q=>q[0]+' '+q[1]).join('L')+'Z').join('');
+el('path',{d:pathOf(BM.walk),fill:'var(--walk)','fill-rule':'evenodd'},layers.base);
+el('path',{d:pathOf(BM.halls),fill:'var(--hall)',stroke:'var(--line)','stroke-width':1.5,'stroke-linejoin':'round'},layers.base);
+for(const d in BM.bldg)
+  el('path',{d:pathOf(BM.bldg[d]),fill:`var(--d-${d})`,stroke:'var(--bg)','stroke-width':1,'stroke-linejoin':'round'},layers.base);
+if(BM.kiosk.length)el('path',{d:pathOf(BM.kiosk),fill:'var(--kiosk)',stroke:'var(--bg)','stroke-width':1},layers.base);
+// district name labels
+const DLABELS={adirondacks:[618,470],saratoga:[1235,268],hudson:[1330,672],hamptons:[1042,893],niagara:[1400,1243],markethall:[688,868]};
+for(const d in DLABELS){
+  const g=el('g',{},layers.base); upright(g,DLABELS[d][0],DLABELS[d][1]);
+  const t=el('text',{class:'dlabel','text-anchor':'middle','font-size':d==='markethall'?15:20,fill:DCOLORS[d],'fill-opacity':0.75,stroke:'var(--bg)','stroke-width':3.5},g);
+  t.textContent=DNAMES[d];
+}
+// suite numbers, visible when zoomed right in
+for(const suite in (DATA.suites||{})){
+  const [sx,sy]=DATA.suites[suite];
+  const g=el('g',{},layers.suites); upright(g,sx,sy);
+  const t=el('text',{class:'suite','text-anchor':'middle',y:4,'font-size':10.5,fill:'var(--ink2)',stroke:'var(--bg)','stroke-width':2.5},g);
+  t.textContent=suite;
+}
 
 // district tint polygons (hidden until a district chip is selected)
 const distPolys={};
@@ -484,7 +560,6 @@ function highlightDistrict(id){
 }
 
 // store dots + labels
-const counterRot=[]; // [{g,x,y}] groups to keep upright when map rotates
 const storeEls=[];
 for(const st of DATA.stores){
   const c=DCOLORS[st.district]||'#666';
@@ -492,30 +567,27 @@ for(const st of DATA.stores){
   const dot=el('circle',{cx:st.x,cy:st.y,r:7,fill:c,stroke:'#fff','stroke-width':2.2,'pointer-events':'all'},g);
   dot.style.cursor='pointer';
   dot.addEventListener('pointerup',e=>{if(!moved){selectStore(st); e.stopPropagation();}});
-  const lg=el('g',{transform:`translate(${st.x},${st.y})`},layers.labels);
+  const lg=el('g',{},layers.labels); upright(lg,st.x,st.y);
   const t=el('text',{class:'slabel','text-anchor':'middle',y:-13,'font-size':MAJORS.has(st.suite)?15:12.5,fill:'var(--ink)',stroke:'var(--bg)','stroke-width':3.5},lg);
   t.textContent=st.name;
   lg.dataset.major=MAJORS.has(st.suite)?'1':'0';
-  counterRot.push({g:lg,x:st.x,y:st.y});
   storeEls.push({st,g,lg,dot});
 }
 // amenities
 for(const a of DATA.amenities){
-  const g=el('g',{transform:`translate(${a.xy[0]},${a.xy[1]})`,class:'amen-g'},layers.amen);
+  const g=el('g',{class:'amen-g'},layers.amen); upright(g,a.xy[0],a.xy[1]);
   el('circle',{r:11,fill:'var(--panel)',stroke:'var(--line)','stroke-width':1.5},g);
   const t=el('text',{'text-anchor':'middle',y:4.5,'font-size':12},g); t.textContent=a.icon;
   g.style.cursor='pointer';
   g.addEventListener('pointerup',e=>{if(!moved){selectStore({name:a.name,suite:'',cat:'Amenity',district:null,x:a.xy[0],y:a.xy[1],node:a.node}); e.stopPropagation();}});
-  counterRot.push({g,x:a.xy[0],y:a.xy[1],isT:true});
 }
 // parking badges
 for(const p of DATA.parking){
-  const g=el('g',{transform:`translate(${p.xy[0]},${p.xy[1]})`,class:'amen-g'},layers.amen);
+  const g=el('g',{class:'amen-g'},layers.amen); upright(g,p.xy[0],p.xy[1]);
   el('rect',{x:-15,y:-15,width:30,height:30,rx:8,fill:p.color,stroke:'#fff','stroke-width':2},g);
   const t=el('text',{'text-anchor':'middle',y:6,'font-size':17,'font-weight':800,fill:'#fff'},g); t.textContent='P';
   g.style.cursor='pointer';
   g.addEventListener('pointerup',e=>{if(!moved){selectStore({name:p.name,suite:'',cat:'Parking',district:null,x:p.xy[0],y:p.xy[1],node:p.node}); e.stopPropagation();}});
-  counterRot.push({g,x:p.xy[0],y:p.xy[1],isT:true});
 }
 
 // route
@@ -524,7 +596,6 @@ let routeLine=el('polyline',{class:'routeline',fill:'none',stroke:'var(--accent)
 let destPin=el('g',{opacity:0},layers.route);
 el('path',{d:'M0,-34 C-11,-34 -16,-25 -16,-18 C-16,-8 0,4 0,4 C0,4 16,-8 16,-18 C16,-25 11,-34 0,-34Z',fill:'var(--accent)',stroke:'#fff','stroke-width':2},destPin);
 el('circle',{cy:-19,r:5,fill:'#fff'},destPin);
-counterRot.push({g:destPin,dyn:true});
 function drawRoute(){
   if(S.route&&(S.navigating||S.sel)){
     const p=S.route.pts.map(q=>q.join(',')).join(' ');
@@ -537,7 +608,7 @@ function drawRoute(){
 }
 function placePin(){
   if(!S.sel)return;
-  destPin.setAttribute('transform',`translate(${S.sel.x},${S.sel.y}) rotate(${-S.rot*180/Math.PI})`);
+  upright(destPin,S.sel.x,S.sel.y);
 }
 
 // user marker
@@ -561,22 +632,18 @@ userG.addEventListener('pointerdown',e=>{if(S.demo){dragUser=true; e.stopPropaga
 window.addEventListener('pointermove',e=>{if(dragUser){const [x,y]=screenToWorld(e.clientX,e.clientY); S.pos={x,y}; drawUser(); if(S.navigating)reroute();}});
 window.addEventListener('pointerup',()=>{if(dragUser){dragUser=false; renderSheet();}});
 
-function updateCounterRot(){
-  const deg=-S.rot*180/Math.PI;
-  for(const it of counterRot){
-    if(it.dyn){placePin();continue;}
-    it.g.setAttribute('transform',`translate(${it.x},${it.y}) rotate(${deg})`);
-  }
-  drawUser();
-}
+let zoomKey='';
 function updateZoomClasses(){
-  const showAll=S.k>0.85, showMaj=S.k>0.45;
+  const showAll=S.k>0.85, showMaj=S.k>0.45, showAmen=S.k>0.32, showSuites=S.k>1.05, smallDot=S.k>1.4;
+  const key=`${showAll}|${showMaj}|${showAmen}|${showSuites}|${smallDot}`;
+  if(key===zoomKey)return; zoomKey=key;
   for(const {lg} of storeEls){
     const maj=lg.dataset.major==='1';
     lg.style.display=(showAll||maj&&showMaj)?'':'none';
   }
-  layers.amen.style.display=S.k>0.32?'':'none';
-  for(const {dot} of storeEls)dot.setAttribute('r',S.k>1.4?5:7);
+  layers.amen.style.display=showAmen?'':'none';
+  layers.suites.style.display=showSuites?'':'none';
+  for(const {dot} of storeEls)dot.setAttribute('r',smallDot?5:7);
 }
 
 /* ================= UI: chips ================= */
