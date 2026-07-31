@@ -1,0 +1,744 @@
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>Woodbury Common Navigator</title>
+<style>
+:root{
+  --bg:#f5f4f1; --panel:#ffffff; --ink:#1c1c1e; --ink2:#5c5b57; --line:#e3e1db;
+  --accent:#0d9488; --accent-ink:#ffffff; --chip:#eceae5; --shadow:0 6px 24px rgba(20,20,18,.14);
+  --good:#15803d; --warn:#b45309; --bad:#b91c1c;
+  --d-adirondacks:#2d5b2d; --d-saratoga:#cc1236; --d-hudson:#6b4a2f;
+  --d-hamptons:#e08a14; --d-niagara:#4a5fc0; --d-markethall:#6f6e6a;
+  --map-filter:none;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#191a1c; --panel:#232427; --ink:#f0efec; --ink2:#a3a29d; --line:#37383c;
+  --accent:#2dd4bf; --accent-ink:#08312c; --chip:#2e2f33; --shadow:0 6px 24px rgba(0,0,0,.5);
+  --d-hamptons:#f0a83c; --d-markethall:#989792;
+  --map-filter:brightness(.82) contrast(1.05) saturate(.95);
+}}
+:root[data-theme="light"]{
+  --bg:#f5f4f1; --panel:#ffffff; --ink:#1c1c1e; --ink2:#5c5b57; --line:#e3e1db;
+  --accent:#0d9488; --accent-ink:#ffffff; --chip:#eceae5; --shadow:0 6px 24px rgba(20,20,18,.14);
+  --d-hamptons:#e08a14; --d-markethall:#6f6e6a; --map-filter:none;
+}
+:root[data-theme="dark"]{
+  --bg:#191a1c; --panel:#232427; --ink:#f0efec; --ink2:#a3a29d; --line:#37383c;
+  --accent:#2dd4bf; --accent-ink:#08312c; --chip:#2e2f33; --shadow:0 6px 24px rgba(0,0,0,.5);
+  --d-hamptons:#f0a83c; --d-markethall:#989792;
+  --map-filter:brightness(.82) contrast(1.05) saturate(.95);
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0; height:100%; overflow:hidden}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg); color:var(--ink); position:fixed; inset:0;
+  touch-action:none; overscroll-behavior:none;
+}
+button{font:inherit; color:inherit; border:0; background:none; cursor:pointer; padding:0}
+input{font:inherit; color:inherit}
+
+/* ---------- map ---------- */
+#viewport{position:absolute; inset:0; overflow:hidden; background:var(--bg)}
+#rotor{position:absolute; inset:0; will-change:transform}
+#world{position:absolute; left:0; top:0; width:1870px; height:1640px; transform-origin:0 0; will-change:transform}
+#world img{position:absolute; inset:0; width:1870px; height:1640px; filter:var(--map-filter); pointer-events:none; user-select:none; -webkit-user-drag:none}
+#overlay{position:absolute; left:0; top:0; pointer-events:none}
+
+/* ---------- top chrome ---------- */
+#topbar{position:absolute; top:calc(10px + env(safe-area-inset-top)); left:12px; right:12px; z-index:30; display:flex; flex-direction:column; gap:8px; pointer-events:none}
+#searchwrap{display:flex; gap:8px; align-items:center; pointer-events:auto}
+#searchbox{
+  flex:1; display:flex; align-items:center; gap:10px; background:var(--panel);
+  border-radius:14px; padding:11px 14px; box-shadow:var(--shadow); border:1px solid var(--line);
+}
+#searchbox svg{flex:none; opacity:.55}
+#q{flex:1; border:0; outline:0; background:none; font-size:15px; min-width:0}
+#q::placeholder{color:var(--ink2)}
+#clearq{display:none; opacity:.5; font-size:17px; line-height:1; padding:2px 4px}
+#brand{font-size:10px; font-weight:800; letter-spacing:.14em; color:var(--ink2); text-transform:uppercase; margin:0 2px}
+#chips{display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; pointer-events:auto; padding-bottom:2px}
+#chips::-webkit-scrollbar{display:none}
+.chip{
+  flex:none; display:flex; align-items:center; gap:6px; background:var(--panel); border:1px solid var(--line);
+  border-radius:999px; padding:6px 12px 6px 8px; font-size:12.5px; font-weight:600; box-shadow:0 2px 8px rgba(20,20,18,.08);
+}
+.chip .dot{width:10px; height:10px; border-radius:50%}
+.chip.on{outline:2px solid var(--accent); outline-offset:-1px}
+
+/* ---------- FABs ---------- */
+#fabs{position:absolute; right:12px; bottom:210px; z-index:25; display:flex; flex-direction:column; gap:10px}
+.fab{
+  width:46px; height:46px; border-radius:14px; background:var(--panel); border:1px solid var(--line);
+  box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center;
+}
+.fab svg{width:22px; height:22px}
+.fab.active{background:var(--accent); color:var(--accent-ink); border-color:transparent}
+#compassFab .needle{transform-origin:50% 50%; transition:transform .15s linear}
+
+/* ---------- bottom sheet ---------- */
+#sheet{
+  position:absolute; left:0; right:0; bottom:0; z-index:40; background:var(--panel);
+  border-radius:18px 18px 0 0; box-shadow:0 -8px 30px rgba(20,20,18,.18);
+  transform:translateY(0); transition:transform .28s cubic-bezier(.3,.9,.3,1);
+  height:78vh; display:flex; flex-direction:column; border:1px solid var(--line); border-bottom:0;
+}
+#sheet.noanim{transition:none}
+#grab{padding:9px 0 5px; flex:none; cursor:grab; touch-action:none}
+#grab::before{content:""; display:block; width:38px; height:4px; border-radius:2px; background:var(--line); margin:0 auto}
+#sheetHead{padding:2px 16px 10px; flex:none}
+#sheetBody{flex:1; overflow-y:auto; padding:0 16px 24px; overscroll-behavior:contain; touch-action:pan-y}
+h1{font-size:17px; font-weight:800; letter-spacing:-.01em; margin:0}
+.sub{font-size:12.5px; color:var(--ink2); margin-top:2px}
+.row{display:flex; align-items:center; gap:10px}
+.spread{justify-content:space-between}
+
+.storeitem{display:flex; align-items:center; gap:12px; padding:11px 2px; border-bottom:1px solid var(--line); width:100%; text-align:left}
+.storeitem .swatch{flex:none; width:12px; height:12px; border-radius:4px}
+.storeitem .nm{font-size:14.5px; font-weight:600}
+.storeitem .meta{font-size:11.5px; color:var(--ink2)}
+.storeitem .dist{margin-left:auto; font-size:12px; color:var(--ink2); font-variant-numeric:tabular-nums; white-space:nowrap}
+
+.seclabel{font-size:10.5px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--ink2); margin:18px 0 6px}
+.catgrid{display:flex; flex-wrap:wrap; gap:6px}
+.catbtn{background:var(--chip); border-radius:10px; padding:7px 11px; font-size:12.5px; font-weight:600}
+.catbtn.on{background:var(--accent); color:var(--accent-ink)}
+
+.bigbtn{
+  display:flex; align-items:center; justify-content:center; gap:8px; width:100%;
+  background:var(--accent); color:var(--accent-ink); font-weight:700; font-size:15px;
+  border-radius:14px; padding:14px; margin-top:14px;
+}
+.bigbtn.ghost{background:var(--chip); color:var(--ink)}
+.bigbtn:disabled{opacity:.5}
+.pill{display:inline-flex; align-items:center; gap:6px; border-radius:999px; padding:4px 10px; font-size:11.5px; font-weight:700}
+
+#navstats{display:flex; gap:18px; margin-top:10px}
+#navstats .stat{display:flex; flex-direction:column}
+#navstats .v{font-size:26px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.02em}
+#navstats .k{font-size:10.5px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--ink2)}
+
+#toast{
+  position:absolute; left:50%; transform:translateX(-50%) translateY(-8px); bottom:calc(24px + 78vh*0);
+  top:auto; z-index:60; background:var(--ink); color:var(--bg); font-size:13px; font-weight:600;
+  padding:10px 16px; border-radius:12px; opacity:0; transition:opacity .25s, transform .25s; pointer-events:none;
+  max-width:88vw; text-align:center; bottom:calc(30vh);
+}
+#toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+#banner{
+  position:absolute; z-index:29; left:12px; right:12px; top:calc(112px + env(safe-area-inset-top));
+  background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--warn);
+  border-radius:12px; padding:10px 12px; font-size:12.5px; box-shadow:var(--shadow); display:none;
+}
+#banner .row{margin-top:8px; gap:8px}
+#banner button{background:var(--chip); border-radius:8px; padding:6px 10px; font-weight:700; font-size:12px}
+#banner button.primary{background:var(--accent); color:var(--accent-ink)}
+
+@media (prefers-reduced-motion: reduce){
+  *{transition:none !important; animation:none !important}
+}
+
+/* SVG marker text */
+.slabel{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; font-weight:700; paint-order:stroke; pointer-events:none}
+.routeline{stroke-dasharray:14 10; animation:march 1.2s linear infinite}
+@keyframes march{to{stroke-dashoffset:-24}}
+</style>
+
+<div id="viewport">
+  <div id="rotor">
+    <div id="world">
+      <img id="mapimg" src="__MAPIMG__" alt="Woodbury Common map">
+      <svg id="overlay" width="1870" height="1640" viewBox="0 0 1870 1640"></svg>
+    </div>
+  </div>
+</div>
+
+<div id="topbar">
+  <div id="searchwrap">
+    <div id="searchbox">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.6-3.6"/></svg>
+      <input id="q" placeholder="Search 240 stores — “Nike”, “coffee”, “Gucci”…" autocomplete="off" spellcheck="false" enterkeyhint="search">
+      <button id="clearq" aria-label="Clear search">✕</button>
+    </div>
+  </div>
+  <div id="chips"></div>
+</div>
+
+<div id="banner"></div>
+
+<div id="fabs">
+  <button class="fab" id="compassFab" aria-label="Toggle heading-up mode" title="Compass — rotate map with your heading">
+    <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="9.4" stroke="currentColor" stroke-width="1.6"/><g class="needle"><path d="M12 4.6 14.2 12 12 19.4 9.8 12Z" fill="currentColor" opacity=".25"/><path d="M12 4.6 14.2 12H9.8Z" fill="#e11d48"/></g><circle cx="12" cy="12" r="1.4" fill="currentColor"/></svg>
+  </button>
+  <button class="fab" id="locateFab" aria-label="My location" title="My location">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="7.2"/><circle cx="12" cy="12" r="2.4" fill="currentColor" stroke="none"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3" stroke-linecap="round"/></svg>
+  </button>
+</div>
+
+<div id="sheet">
+  <div id="grab"></div>
+  <div id="sheetHead"></div>
+  <div id="sheetBody"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+"use strict";
+const DATA = __DATA__;
+
+/* ================= config / georeference ================= */
+const GEO = {
+  refPx:[940,700],            // gazebo, map px
+  refLat:41.32120, refLng:-74.12500,
+  metersPerPx:0.45,
+  mapBearing:0,               // degrees: real-world bearing of map "up"
+};
+const WALK_MPS = 1.30;
+const LS = {cal:'wcnav.cal', theme:'wcnav.theme'};
+
+const DCOLORS = {adirondacks:'#2d5b2d', saratoga:'#cc1236', hudson:'#6b4a2f',
+                 hamptons:'#e08a14', niagara:'#4a5fc0', markethall:'#6f6e6a'};
+const DNAMES  = {adirondacks:'Adirondacks', saratoga:'Saratoga', hudson:'Hudson Valley',
+                 hamptons:'Hamptons', niagara:'Niagara', markethall:'Market Hall'};
+// stores whose names are printed on the map — always labelled
+const MAJORS = new Set(['850','934','974','822','812','815','660','600','642','231','101','185','173','145','199','448','441','442','422','461','470','460','283','303','254','266','280','332','318','312','302','215','207','550','684','664','302','337']);
+
+/* ================= state ================= */
+const S = {
+  k:0.42, tx:0, ty:0, rot:0,           // map transform (rot in rad, applied to rotor)
+  headingUp:false, heading:null,        // compass
+  pos:null,                             // {x,y} map px (current user position)
+  gps:null, acc:null,                   // raw gps fix + accuracy meters
+  demo:false,                           // simulated location mode
+  cal:JSON.parse(localStorage.getItem(LS.cal)||'null'), // {dx,dy} px offset applied to gps
+  watching:false, watchId:null,
+  sel:null,                             // selected store/dest object
+  route:null,                           // {pts,[...],distM}
+  navigating:false,
+  district:null, cat:null,
+  sheetY:0,
+};
+
+/* ================= helpers ================= */
+const $=s=>document.querySelector(s);
+const vp=$('#viewport'), rotor=$('#rotor'), world=$('#world'), ov=$('#overlay');
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+const dist2=(a,b)=>{const dx=a[0]-b[0],dy=a[1]-b[1];return dx*dx+dy*dy};
+const fmtDist=m=>{const ft=m*3.28084; return ft<950? Math.round(ft/10)*10+' ft' : (ft/5280).toFixed(2)+' mi';};
+const fmtMin=m=>{const s=m/WALK_MPS; return s<60? '<1' : String(Math.round(s/60));};
+let toastT;
+function toast(msg,ms=2600){const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastT); toastT=setTimeout(()=>t.classList.remove('show'),ms);}
+
+/* ================= transform / pan / zoom ================= */
+function apply(){
+  world.style.transform=`translate(${S.tx}px,${S.ty}px) scale(${S.k})`;
+  rotor.style.transform=`rotate(${S.rot}rad)`;
+  updateCounterRot(); updateZoomClasses();
+}
+function screenToWorld(sx,sy){
+  const r=vp.getBoundingClientRect(), cx=r.width/2, cy=r.height/2;
+  const dx=sx-r.left-cx, dy=sy-r.top-cy, c=Math.cos(-S.rot), s=Math.sin(-S.rot);
+  const wx=cx+dx*c-dy*s, wy=cy+dx*s+dy*c;
+  return [(wx-S.tx)/S.k,(wy-S.ty)/S.k];
+}
+function centerOn(x,y,k){
+  const r=vp.getBoundingClientRect();
+  if(k)S.k=clamp(k,0.18,4);
+  S.tx=r.width/2-x*S.k; S.ty=r.height/2-y*S.k; apply();
+}
+function zoomAt(sx,sy,f){
+  const [wx,wy]=screenToWorld(sx,sy);
+  S.k=clamp(S.k*f,0.18,4);
+  const r=vp.getBoundingClientRect(), cx=r.width/2, cy=r.height/2;
+  const dx=sx-r.left-cx, dy=sy-r.top-cy, c=Math.cos(-S.rot), s=Math.sin(-S.rot);
+  const tx2=cx+dx*c-dy*s, ty2=cy+dx*s+dy*c;
+  S.tx=tx2-wx*S.k; S.ty=ty2-wy*S.k; apply();
+}
+const ptrs=new Map(); let lastPinch=null, pressTimer=null, pressPt=null, moved=false;
+vp.addEventListener('pointerdown',e=>{
+  vp.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId,[e.clientX,e.clientY]); moved=false;
+  if(ptrs.size===1){
+    pressPt=[e.clientX,e.clientY];
+    pressTimer=setTimeout(()=>{ if(!moved){ longPress(pressPt[0],pressPt[1]); } },600);
+  } else { clearTimeout(pressTimer); }
+  if(ptrs.size===2){
+    const a=[...ptrs.values()]; lastPinch={d:Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]), cx:(a[0][0]+a[1][0])/2, cy:(a[0][1]+a[1][1])/2};
+  }
+});
+vp.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;
+  const prev=ptrs.get(e.pointerId); ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+  if(Math.hypot(e.clientX-(pressPt?pressPt[0]:0), e.clientY-(pressPt?pressPt[1]:0))>10){moved=true; clearTimeout(pressTimer);}
+  if(ptrs.size===1){
+    const dx=e.clientX-prev[0], dy=e.clientY-prev[1], c=Math.cos(-S.rot), s=Math.sin(-S.rot);
+    S.tx+=dx*c-dy*s; S.ty+=dx*s+dy*c; apply();
+  } else if(ptrs.size===2){
+    const a=[...ptrs.values()];
+    const d=Math.hypot(a[0][0]-a[1][0],a[0][1]-a[1][1]);
+    const cx=(a[0][0]+a[1][0])/2, cy=(a[0][1]+a[1][1])/2;
+    if(lastPinch){
+      zoomAt(cx,cy,d/lastPinch.d);
+      const dx=cx-lastPinch.cx, dy=cy-lastPinch.cy, c=Math.cos(-S.rot), s=Math.sin(-S.rot);
+      S.tx+=dx*c-dy*s; S.ty+=dx*s+dy*c; apply();
+    }
+    lastPinch={d,cx,cy};
+  }
+});
+function endPtr(e){ptrs.delete(e.pointerId); if(ptrs.size<2)lastPinch=null; clearTimeout(pressTimer);}
+vp.addEventListener('pointerup',endPtr); vp.addEventListener('pointercancel',endPtr);
+vp.addEventListener('wheel',e=>{e.preventDefault(); zoomAt(e.clientX,e.clientY,Math.exp(-e.deltaY*0.0016));},{passive:false});
+vp.addEventListener('dblclick',e=>zoomAt(e.clientX,e.clientY,1.6));
+
+function longPress(sx,sy){
+  const [x,y]=screenToWorld(sx,sy);
+  if(x<0||y<0||x>1870||y>1640)return;
+  if(navigator.vibrate)navigator.vibrate(12);
+  if(S.gps && S.watching && !S.demo){
+    // calibrate: shift projection so current fix lands here
+    const raw=projectRaw(S.gps.lat,S.gps.lng);
+    S.cal={dx:x-raw[0], dy:y-raw[1]};
+    localStorage.setItem(LS.cal,JSON.stringify(S.cal));
+    S.pos={x,y}; toast('Calibrated — your GPS position is now pinned here');
+  } else {
+    S.demo=true; S.pos={x,y};
+    toast('Demo position set — drag or long-press to move it');
+  }
+  drawUser(); if(S.navigating)reroute(); renderSheet();
+}
+
+/* ================= geolocation ================= */
+function projectRaw(lat,lng){
+  const mx=(lng-GEO.refLng)*Math.cos(GEO.refLat*Math.PI/180)*111320;
+  const my=(lat-GEO.refLat)*110540;
+  const b=GEO.mapBearing*Math.PI/180, c=Math.cos(b), s=Math.sin(b);
+  const ex= mx*c - my*s, ny= my*c + mx*s;
+  return [GEO.refPx[0]+ex/GEO.metersPerPx, GEO.refPx[1]-ny/GEO.metersPerPx];
+}
+function project(lat,lng){
+  let [x,y]=projectRaw(lat,lng);
+  if(S.cal){x+=S.cal.dx; y+=S.cal.dy;}
+  return [x,y];
+}
+function startWatch(){
+  if(!('geolocation' in navigator)){offerDemo('Location is not available in this browser.');return;}
+  if(S.watchId!=null)navigator.geolocation.clearWatch(S.watchId);
+  S.watchId=navigator.geolocation.watchPosition(fix=>{
+    S.watching=true;
+    S.gps={lat:fix.coords.latitude,lng:fix.coords.longitude};
+    S.acc=fix.coords.accuracy;
+    const [x,y]=project(S.gps.lat,S.gps.lng);
+    const offMap = x<-150||y<-150||x>2020||y>1790;
+    if(offMap && !S.demo){
+      offerDemo('Your GPS fix is outside the mall area. At the mall, step outdoors for a better fix — or try demo mode.');
+    } else if(!S.demo){
+      hideBanner(); S.pos={x,y};
+      drawUser(); if(S.navigating)reroute(); renderSheet();
+    }
+  },err=>{
+    const ios=/iPhone|iPad|iPod/.test(navigator.userAgent);
+    const framed=(()=>{try{return window.self!==window.top}catch(e){return true}})();
+    let help='';
+    if(err.code===1){
+      if(framed)help='This viewer embeds the app in a frame that blocks location — no browser setting can change that here. Demo mode still works for browsing. For live GPS at the mall, use the standalone copy: <a href="https://rhean-sharma.github.io/mall-navigation-app/" target="_blank" rel="noopener" style="color:var(--accent);font-weight:700">open the live-GPS version</a> and add it to your Home Screen.';
+      else if(ios)help='To allow it on iPhone: Settings → Privacy &amp; Security → Location Services → on, and Safari Websites → “While Using” with <b>Precise Location on</b>. Then in Safari tap the <b>ᴀA</b> button in the address bar → Website Settings → Location → Allow, and hit Retry GPS.';
+      else help='Check your browser’s site permissions for Location, then tap Retry GPS.';
+    }
+    offerDemo((err.code===1?'Location permission was denied.':'Couldn’t get a location fix.')+' You can still explore with demo mode.', help);
+  },{enableHighAccuracy:true,maximumAge:2000,timeout:15000});
+}
+function offerDemo(msg,help){
+  const b=$('#banner');
+  b.style.display='block';
+  b.innerHTML=`<div>${msg}</div>${help?`<div style="margin-top:6px;color:var(--ink2);line-height:1.5">${help}</div>`:''}<div class="row">
+    <button class="primary" id="bDemo">Use demo position</button>
+    <button id="bRetry">Retry GPS</button>
+    <button id="bClose" aria-label="Dismiss">Dismiss</button></div>`;
+  $('#bDemo').onclick=()=>{S.demo=true; S.pos={x:940,y:700}; hideBanner(); drawUser(); centerOn(940,700,Math.max(S.k,0.5)); toast('Demo mode — long-press anywhere to move yourself'); renderSheet();};
+  $('#bRetry').onclick=()=>{hideBanner(); startWatch();};
+  $('#bClose').onclick=hideBanner;
+}
+function hideBanner(){$('#banner').style.display='none';}
+$('#locateFab').addEventListener('click',()=>{
+  if(S.demo && S.pos){centerOn(S.pos.x,S.pos.y,Math.max(S.k,0.7)); return;}
+  startWatch();
+  if(S.pos)centerOn(S.pos.x,S.pos.y,Math.max(S.k,0.7)); else toast('Locating…');
+});
+
+/* ================= compass ================= */
+let compassReady=false;
+function onOrient(e){
+  let h=null;
+  if(typeof e.webkitCompassHeading==='number' && !isNaN(e.webkitCompassHeading)) h=e.webkitCompassHeading;
+  else if(e.absolute && typeof e.alpha==='number') h=(360-e.alpha)%360;
+  else if(typeof e.alpha==='number') h=(360-e.alpha)%360;
+  if(h==null)return;
+  compassReady=true;
+  // smooth (shortest arc)
+  if(S.heading==null)S.heading=h;
+  else{let d=((h-S.heading+540)%360)-180; S.heading=(S.heading+d*0.25+360)%360;}
+  const needle=document.querySelector('#compassFab .needle');
+  const mapH = S.heading - GEO.mapBearing;
+  if(needle)needle.style.transform=`rotate(${-mapH}deg)`;
+  if(S.headingUp){S.rot=-mapH*Math.PI/180; apply();}
+  else drawUser();
+}
+async function enableCompass(){
+  try{
+    if(typeof DeviceOrientationEvent!=='undefined' && typeof DeviceOrientationEvent.requestPermission==='function'){
+      const p=await DeviceOrientationEvent.requestPermission();
+      if(p!=='granted'){toast('Compass permission denied');return false;}
+    }
+    window.addEventListener('deviceorientationabsolute',onOrient);
+    window.addEventListener('deviceorientation',onOrient);
+    setTimeout(()=>{if(!compassReady)toast('No compass data — this device may not have one. Map stays north-up.');},2500);
+    return true;
+  }catch(e){toast('Compass unavailable');return false;}
+}
+$('#compassFab').addEventListener('click',async()=>{
+  if(!compassReady){const ok=await enableCompass(); if(!ok)return;}
+  S.headingUp=!S.headingUp;
+  $('#compassFab').classList.toggle('active',S.headingUp);
+  if(!S.headingUp){S.rot=0; apply();}
+  toast(S.headingUp?'Heading-up — map rotates with you':'North-up');
+});
+
+/* ================= graph / routing ================= */
+const NODES=DATA.nodes, EDGES=DATA.edges;
+const ADJ={};
+for(const id in NODES)ADJ[id]=[];
+for(const [a,b] of EDGES){
+  const d=Math.sqrt(dist2(NODES[a],NODES[b]));
+  ADJ[a].push([b,d]); ADJ[b].push([a,d]);
+}
+function dijkstra(src){
+  const dist={},prev={},Q=new Set(Object.keys(NODES));
+  for(const n of Q)dist[n]=Infinity;
+  dist[src]=0;
+  while(Q.size){
+    let u=null,best=Infinity;
+    for(const n of Q)if(dist[n]<best){best=dist[n];u=n;}
+    if(u==null)break; Q.delete(u);
+    for(const [v,w] of ADJ[u])if(dist[u]+w<dist[v]){dist[v]=dist[u]+w; prev[v]=u;}
+  }
+  return {dist,prev};
+}
+function nearestOnGraph(x,y){
+  // project onto every edge; return {a,b,t,pt,dA,dB, dTo}
+  let best=null;
+  for(const [a,b] of EDGES){
+    const A=NODES[a],B=NODES[b];
+    const vx=B[0]-A[0],vy=B[1]-A[1],L2=vx*vx+vy*vy;
+    let t=L2?((x-A[0])*vx+(y-A[1])*vy)/L2:0; t=clamp(t,0,1);
+    const px=A[0]+vx*t, py=A[1]+vy*t, d=Math.hypot(x-px,y-py);
+    if(!best||d<best.dTo)best={a,b,t,pt:[px,py],dTo:d,dA:Math.hypot(px-A[0],py-A[1]),dB:Math.hypot(px-B[0],py-B[1])};
+  }
+  return best;
+}
+function route(fromXY,toNode,toXY){
+  const st=nearestOnGraph(fromXY[0],fromXY[1]);
+  const {dist,prev}=dijkstra(toNode);
+  const viaA=st.dA+dist[st.a], viaB=st.dB+dist[st.b];
+  const first=viaA<=viaB?st.a:st.b;
+  const pts=[fromXY.slice(), st.pt.slice()];
+  let n=first;
+  const chain=[];
+  while(n!=null){chain.push(n); n=prev[n];}
+  for(const id of chain)pts.push(NODES[id].slice());
+  pts.push(toXY.slice());
+  // drop duplicate consecutive pts
+  const out=[pts[0]]; for(const p of pts)if(Math.hypot(p[0]-out[out.length-1][0],p[1]-out[out.length-1][1])>2)out.push(p);
+  let d=st.dTo+Math.min(viaA,viaB)+Math.hypot(toXY[0]-NODES[toNode][0],toXY[1]-NODES[toNode][1]);
+  return {pts:out, distM:d*GEO.metersPerPx};
+}
+function reroute(){
+  if(!S.sel||!S.pos)return;
+  S.route=route([S.pos.x,S.pos.y], S.sel.node, [S.sel.x,S.sel.y]);
+  drawRoute();
+  if(S.navigating){
+    const remain=$('#navRemain'), eta=$('#navEta');
+    if(remain){remain.textContent=fmtDist(S.route.distM); eta.textContent=fmtMin(S.route.distM);}
+    if(S.route.distM<12){
+      S.navigating=false; drawRoute();
+      toast(`You’ve arrived at ${S.sel.name} 🎉`,4000); renderSheet();
+    }
+  }
+}
+
+/* ================= SVG layers ================= */
+const NS='http://www.w3.org/2000/svg';
+function el(tag,attrs,parent){const n=document.createElementNS(NS,tag); for(const k in attrs)n.setAttribute(k,attrs[k]); (parent||ov).appendChild(n); return n;}
+const layers={};
+for(const name of ['districts','route','stores','labels','amen','user'])layers[name]=el('g',{id:'ly-'+name});
+
+// district tint polygons (hidden until a district chip is selected)
+const distPolys={};
+for(const id in DATA.districts){
+  const d=DATA.districts[id];
+  distPolys[id]=el('polygon',{points:d.poly.map(p=>p.join(',')).join(' '),fill:DCOLORS[id],'fill-opacity':0,stroke:DCOLORS[id],'stroke-opacity':0,'stroke-width':4,'stroke-linejoin':'round'},layers.districts);
+}
+function highlightDistrict(id){
+  for(const k in distPolys){
+    distPolys[k].setAttribute('fill-opacity',k===id?0.16:0);
+    distPolys[k].setAttribute('stroke-opacity',k===id?0.85:0);
+  }
+}
+
+// store dots + labels
+const counterRot=[]; // [{g,x,y}] groups to keep upright when map rotates
+const storeEls=[];
+for(const st of DATA.stores){
+  const c=DCOLORS[st.district]||'#666';
+  const g=el('g',{class:'store-g','data-suite':st.suite},layers.stores);
+  const dot=el('circle',{cx:st.x,cy:st.y,r:7,fill:c,stroke:'#fff','stroke-width':2.2,'pointer-events':'all'},g);
+  dot.style.cursor='pointer';
+  dot.addEventListener('pointerup',e=>{if(!moved){selectStore(st); e.stopPropagation();}});
+  const lg=el('g',{transform:`translate(${st.x},${st.y})`},layers.labels);
+  const t=el('text',{class:'slabel','text-anchor':'middle',y:-13,'font-size':MAJORS.has(st.suite)?15:12.5,fill:'var(--ink)',stroke:'var(--bg)','stroke-width':3.5},lg);
+  t.textContent=st.name;
+  lg.dataset.major=MAJORS.has(st.suite)?'1':'0';
+  counterRot.push({g:lg,x:st.x,y:st.y});
+  storeEls.push({st,g,lg,dot});
+}
+// amenities
+for(const a of DATA.amenities){
+  const g=el('g',{transform:`translate(${a.xy[0]},${a.xy[1]})`,class:'amen-g'},layers.amen);
+  el('circle',{r:11,fill:'var(--panel)',stroke:'var(--line)','stroke-width':1.5},g);
+  const t=el('text',{'text-anchor':'middle',y:4.5,'font-size':12},g); t.textContent=a.icon;
+  g.style.cursor='pointer';
+  g.addEventListener('pointerup',e=>{if(!moved){selectStore({name:a.name,suite:'',cat:'Amenity',district:null,x:a.xy[0],y:a.xy[1],node:a.node}); e.stopPropagation();}});
+  counterRot.push({g,x:a.xy[0],y:a.xy[1],isT:true});
+}
+// parking badges
+for(const p of DATA.parking){
+  const g=el('g',{transform:`translate(${p.xy[0]},${p.xy[1]})`,class:'amen-g'},layers.amen);
+  el('rect',{x:-15,y:-15,width:30,height:30,rx:8,fill:p.color,stroke:'#fff','stroke-width':2},g);
+  const t=el('text',{'text-anchor':'middle',y:6,'font-size':17,'font-weight':800,fill:'#fff'},g); t.textContent='P';
+  g.style.cursor='pointer';
+  g.addEventListener('pointerup',e=>{if(!moved){selectStore({name:p.name,suite:'',cat:'Parking',district:null,x:p.xy[0],y:p.xy[1],node:p.node}); e.stopPropagation();}});
+  counterRot.push({g,x:p.xy[0],y:p.xy[1],isT:true});
+}
+
+// route
+let routeCasing=el('polyline',{fill:'none',stroke:'var(--panel)','stroke-width':13,'stroke-linecap':'round','stroke-linejoin':'round',opacity:0},layers.route);
+let routeLine=el('polyline',{class:'routeline',fill:'none',stroke:'var(--accent)','stroke-width':7,'stroke-linecap':'round','stroke-linejoin':'round',opacity:0},layers.route);
+let destPin=el('g',{opacity:0},layers.route);
+el('path',{d:'M0,-34 C-11,-34 -16,-25 -16,-18 C-16,-8 0,4 0,4 C0,4 16,-8 16,-18 C16,-25 11,-34 0,-34Z',fill:'var(--accent)',stroke:'#fff','stroke-width':2},destPin);
+el('circle',{cy:-19,r:5,fill:'#fff'},destPin);
+counterRot.push({g:destPin,dyn:true});
+function drawRoute(){
+  if(S.route&&(S.navigating||S.sel)){
+    const p=S.route.pts.map(q=>q.join(',')).join(' ');
+    routeCasing.setAttribute('points',p); routeLine.setAttribute('points',p);
+    routeCasing.setAttribute('opacity',S.navigating?0.9:0.45);
+    routeLine.setAttribute('opacity',S.navigating?1:0.55);
+  } else {routeCasing.setAttribute('opacity',0); routeLine.setAttribute('opacity',0);}
+  if(S.sel){destPin.setAttribute('opacity',1); destPin.dataset.x=S.sel.x; destPin.dataset.y=S.sel.y; placePin();}
+  else destPin.setAttribute('opacity',0);
+}
+function placePin(){
+  if(!S.sel)return;
+  destPin.setAttribute('transform',`translate(${S.sel.x},${S.sel.y}) rotate(${-S.rot*180/Math.PI})`);
+}
+
+// user marker
+const userG=el('g',{opacity:0},layers.user);
+const accC=el('circle',{r:0,fill:'var(--accent)',opacity:0.14},userG);
+const cone=el('path',{d:'M0,0 L-30,-52 A60,60 0 0 1 30,-52 Z',fill:'var(--accent)',opacity:0.35},userG);
+el('circle',{r:11,fill:'var(--accent)',stroke:'#fff','stroke-width':3.5},userG);
+function drawUser(){
+  if(!S.pos){userG.setAttribute('opacity',0);return;}
+  userG.setAttribute('opacity',1);
+  const hdg=(S.heading!=null)?(S.heading-GEO.mapBearing):null;
+  const rot=hdg!=null?` rotate(${hdg})`:'';
+  userG.setAttribute('transform',`translate(${S.pos.x},${S.pos.y})${rot}`);
+  cone.setAttribute('opacity',hdg!=null?0.35:0);
+  accC.setAttribute('r',S.acc&&!S.demo?clamp(S.acc/GEO.metersPerPx,20,400):0);
+}
+// drag the demo dot
+userG.style.pointerEvents='all'; userG.style.cursor='grab';
+let dragUser=false;
+userG.addEventListener('pointerdown',e=>{if(S.demo){dragUser=true; e.stopPropagation(); ov.setPointerCapture(e.pointerId);}});
+window.addEventListener('pointermove',e=>{if(dragUser){const [x,y]=screenToWorld(e.clientX,e.clientY); S.pos={x,y}; drawUser(); if(S.navigating)reroute();}});
+window.addEventListener('pointerup',()=>{if(dragUser){dragUser=false; renderSheet();}});
+
+function updateCounterRot(){
+  const deg=-S.rot*180/Math.PI;
+  for(const it of counterRot){
+    if(it.dyn){placePin();continue;}
+    it.g.setAttribute('transform',`translate(${it.x},${it.y}) rotate(${deg})`);
+  }
+  drawUser();
+}
+function updateZoomClasses(){
+  const showAll=S.k>0.85, showMaj=S.k>0.45;
+  for(const {lg} of storeEls){
+    const maj=lg.dataset.major==='1';
+    lg.style.display=(showAll||maj&&showMaj)?'':'none';
+  }
+  layers.amen.style.display=S.k>0.32?'':'none';
+  for(const {dot} of storeEls)dot.setAttribute('r',S.k>1.4?5:7);
+}
+
+/* ================= UI: chips ================= */
+const chipsEl=$('#chips');
+function buildChips(){
+  chipsEl.innerHTML='';
+  for(const id of ['adirondacks','saratoga','hudson','hamptons','niagara','markethall']){
+    const b=document.createElement('button');
+    b.className='chip'; b.innerHTML=`<span class="dot" style="background:${DCOLORS[id]}"></span>${DNAMES[id]}`;
+    b.onclick=()=>{
+      S.district=S.district===id?null:id;
+      [...chipsEl.children].forEach(c=>c.classList.remove('on'));
+      if(S.district){b.classList.add('on'); highlightDistrict(id);
+        const d=DATA.districts[id];
+        const xs=d.poly.map(p=>p[0]), ys=d.poly.map(p=>p[1]);
+        centerOn((Math.min(...xs)+Math.max(...xs))/2,(Math.min(...ys)+Math.max(...ys))/2,0.55);
+      } else highlightDistrict(null);
+      renderSheet(); setSheet('half');
+    };
+    chipsEl.appendChild(b);
+  }
+}
+
+/* ================= UI: sheet ================= */
+const sheet=$('#sheet'), sheetHead=$('#sheetHead'), sheetBody=$('#sheetBody');
+const SNAPS={peek:0.86, half:0.45, full:0.06}; // fraction of sheet height translated down
+let snap='peek';
+function setSheet(name){snap=name; const h=sheet.getBoundingClientRect().height; S.sheetY=h*SNAPS[name]; sheet.style.transform=`translateY(${S.sheetY}px)`;}
+(function(){
+  let sy=null, y0=0, drag=false;
+  const grab=$('#grab');
+  grab.addEventListener('pointerdown',e=>{drag=true; sy=e.clientY; y0=S.sheetY; sheet.classList.add('noanim'); grab.setPointerCapture(e.pointerId);});
+  grab.addEventListener('pointermove',e=>{if(!drag)return; const h=sheet.getBoundingClientRect().height; S.sheetY=clamp(y0+e.clientY-sy,h*SNAPS.full,h*SNAPS.peek); sheet.style.transform=`translateY(${S.sheetY}px)`;});
+  grab.addEventListener('pointerup',()=>{drag=false; sheet.classList.remove('noanim');
+    const h=sheet.getBoundingClientRect().height, f=S.sheetY/h;
+    const best=Object.entries(SNAPS).sort((a,b)=>Math.abs(a[1]-f)-Math.abs(b[1]-f))[0][0];
+    setSheet(best);});
+})();
+
+function storeRow(st,withDist){
+  const c=DCOLORS[st.district]||'#888';
+  const d=(withDist&&S.pos)?route([S.pos.x,S.pos.y],st.node,[st.x,st.y]).distM:null;
+  return `<button class="storeitem" data-suite="${st.suite}" data-name="${st.name.replace(/"/g,'&quot;')}">
+    <span class="swatch" style="background:${c}"></span>
+    <span><div class="nm">${st.name}</div>
+    <div class="meta">${st.suite?('Suite '+st.suite+' · '):''}${DNAMES[st.district]||''}${st.cat&&st.cat!=='Amenity'?' · '+st.cat:''}</div></span>
+    ${d!=null?`<span class="dist">${fmtDist(d)}<br>${fmtMin(d)} min walk</span>`:''}
+  </button>`;
+}
+function bindRows(){
+  sheetBody.querySelectorAll('.storeitem').forEach(b=>{
+    b.onclick=()=>{
+      const st=DATA.stores.find(s=>s.suite===b.dataset.suite&&s.name===b.dataset.name);
+      if(st)selectStore(st);
+    };
+  });
+}
+const CATS=['Fashion & Sportswear','Shoes','Accessories & Jewelry','Food & Drink','Beauty & Gifts','Kids','Home','Luggage & Leather'];
+const CATICON={'Fashion & Sportswear':'👕','Shoes':'👟','Accessories & Jewelry':'⌚','Food & Drink':'☕','Beauty & Gifts':'🎁','Kids':'🧸','Home':'🏠','Luggage & Leather':'🧳'};
+
+function renderSheet(){
+  const q=$('#q').value.trim().toLowerCase();
+  $('#clearq').style.display=q?'block':'none';
+
+  if(S.sel){renderStoreSheet();return;}
+
+  let list=DATA.stores;
+  if(S.district)list=list.filter(s=>s.district===S.district);
+  if(S.cat)list=list.filter(s=>s.cat===S.cat);
+  if(q)list=list.filter(s=>s.name.toLowerCase().includes(q)||('suite '+s.suite.toLowerCase()).includes(q)||s.cat.toLowerCase().includes(q));
+  list=[...list].sort((a,b)=>a.name.localeCompare(b.name));
+
+  if(q||S.district||S.cat){
+    const ctx=[S.district?DNAMES[S.district]:null,S.cat,q?`“${q}”`:null].filter(Boolean).join(' · ');
+    sheetHead.innerHTML=`<div class="row spread"><div><h1>${list.length} result${list.length!==1?'s':''}</h1><div class="sub">${ctx}</div></div>
+      <button class="pill" style="background:var(--chip)" id="resetF">Clear</button></div>`;
+    $('#resetF').onclick=()=>{$('#q').value=''; S.district=null; S.cat=null; highlightDistrict(null); [...chipsEl.children].forEach(c=>c.classList.remove('on')); renderSheet();};
+    sheetBody.innerHTML=list.map(s=>storeRow(s,true)).join('')||`<div class="sub" style="padding:20px 0">Nothing matches. Try a shorter search.</div>`;
+    bindRows();
+  } else {
+    sheetHead.innerHTML=`<h1>Woodbury Common</h1><div class="sub">${DATA.stores.length} stores · 6 districts · ${S.pos?(S.demo?'demo position active':'live GPS'):'location off'}</div>`;
+    let html=`<div class="seclabel">Browse</div><div class="catgrid">`+
+      CATS.map(c=>`<button class="catbtn" data-cat="${c}">${CATICON[c]} ${c}</button>`).join('')+`</div>`;
+    html+=`<div class="seclabel">Find your way</div><div class="catgrid">`+
+      DATA.parking.map(p=>`<button class="catbtn" data-park="${p.id}">🅿️ ${p.name}</button>`).join('')+
+      DATA.amenities.slice(0,3).map(a=>`<button class="catbtn" data-amen="${a.id}">${a.icon} ${a.name}</button>`).join('')+`</div>`;
+    html+=`<div class="seclabel">Tips</div>
+      <div class="sub" style="line-height:1.55">· Tap any dot on the map, or search above, then <b>Navigate</b> for the quickest walking route.<br>
+      · Tap the compass to rotate the map with the direction you’re facing.<br>
+      · Long-press the map to fine-tune your position (or set a demo position when off-site).</div>`;
+    sheetBody.innerHTML=html;
+    sheetBody.querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{S.cat=b.dataset.cat; renderSheet(); setSheet('half');});
+    sheetBody.querySelectorAll('[data-park]').forEach(b=>b.onclick=()=>{
+      const p=DATA.parking.find(x=>x.id===b.dataset.park);
+      selectStore({name:p.name,suite:'',cat:'Parking',district:null,x:p.xy[0],y:p.xy[1],node:p.node});
+    });
+    sheetBody.querySelectorAll('[data-amen]').forEach(b=>b.onclick=()=>{
+      const a=DATA.amenities.find(x=>x.id===b.dataset.amen);
+      selectStore({name:a.name,suite:'',cat:'Amenity',district:null,x:a.xy[0],y:a.xy[1],node:a.node});
+    });
+  }
+}
+function renderStoreSheet(){
+  const st=S.sel, c=DCOLORS[st.district]||'#888';
+  const d=S.pos?route([S.pos.x,S.pos.y],st.node,[st.x,st.y]):null;
+  sheetHead.innerHTML=`<div class="row spread">
+    <div class="row"><span class="swatch" style="width:14px;height:14px;border-radius:5px;background:${c};display:inline-block"></span>
+      <div><h1>${st.name}</h1><div class="sub">${st.suite?('Suite '+st.suite+' · '):''}${DNAMES[st.district]||st.cat}</div></div></div>
+    <button class="pill" style="background:var(--chip)" id="closeSel">✕</button></div>`;
+  $('#closeSel').onclick=()=>{clearSel();};
+  if(S.navigating){
+    sheetHead.innerHTML+=`<div id="navstats">
+      <div class="stat"><span class="v" id="navRemain">${d?fmtDist(d.distM):'—'}</span><span class="k">remaining</span></div>
+      <div class="stat"><span class="v"><span id="navEta">${d?fmtMin(d.distM):'—'}</span> min</span><span class="k">walking</span></div>
+    </div><button class="bigbtn ghost" id="endNav">End navigation</button>`;
+    $('#endNav').onclick=()=>{S.navigating=false; drawRoute(); renderSheet();};
+    sheetBody.innerHTML=`<div class="sub" style="margin-top:6px;line-height:1.5">Follow the teal line. The route updates live as you move${S.demo?' — drag your dot to simulate walking':''}.</div>`;
+  } else {
+    sheetHead.innerHTML+= d?`<div class="sub" style="margin-top:6px">${fmtDist(d.distM)} away · about ${fmtMin(d.distM)} min on foot</div>`:'';
+    sheetBody.innerHTML=`
+      <button class="bigbtn" id="goBtn">${S.pos?'Navigate — quickest way':'Navigate (turn on location first)'}</button>
+      ${!S.pos?'<button class="bigbtn ghost" id="locBtn">Use my location</button><button class="bigbtn ghost" id="demoBtn">Try demo position</button>':''}
+      <div class="sub" style="margin-top:14px;line-height:1.5">${st.cat==='Parking'?'Routes you to the walkway entrance nearest this lot.':st.cat==='Amenity'?'':'Category: '+st.cat+'.'}</div>`;
+    $('#goBtn').onclick=()=>{
+      if(!S.pos){toast('Turn on location or set a demo position first');return;}
+      S.navigating=true; reroute(); renderSheet(); setSheet('half'); fitRoute();
+    };
+    const lb=$('#locBtn'); if(lb)lb.onclick=()=>startWatch();
+    const db=$('#demoBtn'); if(db)db.onclick=()=>{S.demo=true; S.pos={x:940,y:700}; drawUser(); renderSheet(); toast('Demo mode — long-press the map to move yourself');};
+  }
+}
+function selectStore(st){
+  S.sel=st; S.navigating=false;
+  if(S.pos)S.route=route([S.pos.x,S.pos.y],st.node,[st.x,st.y]); else S.route=null;
+  drawRoute(); renderSheet(); setSheet('half');
+  centerOn(st.x,st.y,Math.max(S.k,0.75));
+}
+function clearSel(){S.sel=null; S.navigating=false; S.route=null; drawRoute(); renderSheet(); setSheet('peek');}
+function fitRoute(){
+  if(!S.route)return;
+  const xs=S.route.pts.map(p=>p[0]), ys=S.route.pts.map(p=>p[1]);
+  const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const r=vp.getBoundingClientRect();
+  const k=clamp(Math.min(r.width/(x1-x0+220), (r.height*0.55)/(y1-y0+220)),0.25,1.2);
+  centerOn((x0+x1)/2,(y0+y1)/2+ (r.height*0.14)/k, k);
+}
+
+/* ================= search ================= */
+$('#q').addEventListener('input',()=>{if(S.sel)clearSel(); renderSheet(); setSheet('half');});
+$('#q').addEventListener('focus',()=>{if(!S.sel)setSheet('half');});
+$('#clearq').addEventListener('click',()=>{$('#q').value=''; renderSheet();});
+
+/* ================= boot ================= */
+buildChips();
+renderSheet();
+(function init(){
+  const r=vp.getBoundingClientRect();
+  const k=Math.min(r.width/1870, r.height/1640)*1.12;
+  S.k=clamp(k,0.18,4);
+  centerOn(935,760,S.k);
+  setSheet('peek');
+  startWatch();
+})();
+window.addEventListener('resize',()=>setSheet(snap));
+</script>
